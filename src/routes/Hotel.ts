@@ -2,7 +2,7 @@ import express from "express";
 import { verifyToken } from "../middlware/VerifyToken";
 import { hotelRegistrationValidation } from "../middlware/validation";
 import multer from "multer";
-import { createHotel } from "../controllers/Hotel";
+import { createHotel, fetchHotels } from "../controllers/Hotel";
 
 const MAX_IMAGES_ALLOWED_PER_HOTEL = 6
 
@@ -16,5 +16,6 @@ const upload = multer({
 
 const router = express.Router();
 router.post("/", upload.array('imageFiles', MAX_IMAGES_ALLOWED_PER_HOTEL), hotelRegistrationValidation, verifyToken, createHotel);
+router.get('/', verifyToken, fetchHotels)
 
 export default router;

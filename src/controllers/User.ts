@@ -22,15 +22,11 @@ const register = async (req: Request, res: Response): Promise<any> => {
       }
     );
 
-    res.cookie("auth_token", token, {
-      maxAge: 24 * 60 * 60 * 1000,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-    });
-
-    res.status(200).send({ message: 'User registration successful'});
+    res
+      .status(200)
+      .send({ auth_token: token, message: "User registration successful" });
   } catch (err) {
-    console.log(err)
+    console.log(err);
     res.status(500).json({ message: "Error registering user!" });
   }
 };
@@ -56,13 +52,7 @@ const login = async (req: Request, res: Response): Promise<any> => {
       }
     );
 
-    res.cookie("auth_token", token, {
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000,
-      secure: process.env.NODE_ENV === "production",
-    });
-
-    res.status(200).json({ userId: user._id });
+    res.status(200).json({ userId: user._id, auth_token: token });
   } catch (err) {
     res.status(500).json({ message: "Cannot login! Please try again" });
   }

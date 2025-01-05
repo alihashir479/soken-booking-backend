@@ -10,14 +10,15 @@ declare global {
 }
 
 export const verifyToken = (req: Request, res: Response, next: NextFunction):void => {
-  const token = req.cookies["auth_token"];
-  if (!token) {
+  const token = req.headers["authorization"] as string;
+  if (!token || !token.startsWith('Bearer')) {
     res.status(401).send({ message: "Unauthorized" });
     return
   }
 
   try {
-    jwt.verify(token, process.env.JWT_SECRET_KEY as string, (err: VerifyErrors | null, decoded: any) => {
+    const [bearerText, authToken] = token.split(' ')
+    jwt.verify(authToken, process.env.JWT_SECRET_KEY as string, (err: VerifyErrors | null, decoded: any) => {
       if (err) {
         throw err;
       }
