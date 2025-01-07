@@ -8,6 +8,7 @@ import { v2 as cloudinary} from 'cloudinary'
 //Routes
 import UserRoutes from "./routes/User";
 import AuthRoutes from "./routes/Auth";
+import MyHotelRoutes from "./routes/MyHotel";
 import HotelRoutes from "./routes/Hotel";
 
 const app = express();
@@ -22,7 +23,8 @@ mongoose
 
 app.use("/api/user", UserRoutes);
 app.use('/api/auth', AuthRoutes)
-app.use('/api/my-hotels', HotelRoutes)
+app.use('/api/my-hotels', MyHotelRoutes)
+app.use('/api/hotels', HotelRoutes)
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,

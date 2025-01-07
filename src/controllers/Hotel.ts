@@ -1,105 +1,84 @@
 import { Request, Response } from "express";
-import cloudinary from "cloudinary";
 import Hotel from "../models/Hotel";
 
-const createHotel = async (req: Request, res: Response) => {
+const searchHotels = async (req: Request, res: Response) => {
   try {
-    const images = req.files as Express.Multer.File[];
-    const userId = req.userId;
+    const destination = req.query.destination as string;
+    const adultCount = parseInt(req.query.adultCount as string) || 1;
+    const childCount = parseInt(req.query.childCount as string) || 1;
+    const price = req.query.price ? parseInt(req.query.price as string) : null;
+    const stars = req.query.stars as string;
+    const types = req.query.types as string;
+    const facilities = req.query.facilities as string;
+    const sortOptions = req.query.sortOptions as string;
+    const pageNumber = parseInt(req.query.page as string) || 1;
 
-    const imageUrls = await uploadImagesToCloudinary(images);
-    const newHotel = new Hotel(req.body);
+    let sortBy = {};
 
-    newHotel.imageUrls = imageUrls;
-    newHotel.userId = userId;
-    newHotel.lastUpdated = new Date();
+    let query: any = {};
 
-    await newHotel.save();
-
-    res.status(201).json(newHotel);
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "Error creating hotel" });
-  }
-};
-
-const fetchHotels = async (req: Request, res: Response) => {
-  try {
-    const hotels = await Hotel.find({ userId: req.userId });
-    res.json(hotels);
-  } catch (err) {
-    console.log(err);
-    res.status(500).json({ message: "Error fetching hotels" });
-  }
-};
-
-const fetchHotelById = async (req: Request, res: Response) => {
-  try {
-    const { id: hotelId } = req.params;
-    const hotel = await Hotel.findOne({ _id: hotelId, userId: req.userId });
-    if (!hotel) {
-      res.status(404).json({ message: "No hotel found" });
-      return;
-    }
-    res.json(hotel);
-  } catch (err) {
-    console.log(err);
-    res.status(500).json({ message: "Error fetching hotels" });
-  }
-};
-
-const updateHotel = async (req: Request, res: Response) => {
-  try {
-    const { id:hotelId } = req.params
-    const images = req.files as Express.Multer.File[]
-
-    const hotel = await Hotel.findById(hotelId)
-
-    if(!hotel) {
-      res.status(404).json({ message: 'No hotel found'})
-      return
+    if (destination) {
+      query["$or"] = [
+        { city: new RegExp(destination, "i") },
+        { country: new RegExp(destination, "i") },
+      ];
     }
 
-    if(hotel.userId.toString() !== req.userId.toString()) {
-      res.status(401).json({ message: 'Unauthorized'})
-      return
+    query["adultCount"] = { $gte: adultCount };
+    query["childCount"] = { $gte: childCount };
+
+    if (stars) {
+      const starsArray = stars.split(",").map((star) => parseInt(star));
+      query["starRating"] = { $in: starsArray };
     }
 
-    const imageUrls = await uploadImagesToCloudinary(images)
+    if (types) {
+      query["type"] = { $in: types.split(",") };
+    }
 
-    hotel.lastUpdated = new Date()
-    hotel.imageUrls = [...imageUrls, ...(req.body.imageUrls || [])]
+    if (facilities) {
+      query["facilities"] = { $all: facilities.split(",") };
+    }
 
-    // Fill other data
-    hotel.name = req.body.name
-    hotel.city = req.body.city
-    hotel.country = req.body.country
-    hotel.description = req.body.description
-    hotel.type = req.body.type
-    hotel.adultCount = req.body.adultCount
-    hotel.childCount = req.body.childCount
-    hotel.pricePerNight = req.body.pricePerNight
-    hotel.starRating = req.body.starRating
-    hotel.facilities = req.body.facilities
+    if (price) {
+      query["pricePerNight"] = { $lte: price };
+    }
 
-    await hotel.save()
-    res.status(201).json(hotel)
+    if (sortOptions) {
+      switch (sortOptions) {
+        case "starRating":
+          sortBy = { starRating: 1 };
+          break;
+        case "pricePerNightAsc":
+          console.log('pricePerNightAsc')
+          sortBy = { pricePerNight: 1 };
+          break;
+        case "pricePerNightDsc":
+          sortBy = { pricePerNight: -1 };
+          break;
+      }
+    }
 
+    const pageSize = 5;
+    const skipDocs = (pageNumber - 1) * pageSize;
+
+    const hotels = await Hotel.find(query).sort(sortBy).skip(skipDocs).limit(pageSize);
+    const total = await Hotel.countDocuments(query);
+
+    const response = {
+      data: hotels,
+      pagination: {
+        total,
+        page: pageNumber,
+        pages: Math.ceil(total / pageSize),
+      },
+    };
+
+    res.json(response);
   } catch (err) {
     console.log(err);
-    res.status(500).json({ message: "Error updating hotel" });
+    res.status(500).json({ message: "Error searching hotels" });
   }
 };
 
-const uploadImagesToCloudinary = async (images: Express.Multer.File[]) => {
-  const imagePromises = images.map(async (image) => {
-    const base64String = Buffer.from(image.buffer).toString("base64");
-    const base64Image = `data:${image.mimetype};base64,${base64String}`;
-    const imageUrl = await cloudinary.v2.uploader.upload(base64Image);
-    return imageUrl.url;
-  });
-
-  return await Promise.all(imagePromises);
-};
-
-export { createHotel, fetchHotels, fetchHotelById, updateHotel };
+export { searchHotels };
