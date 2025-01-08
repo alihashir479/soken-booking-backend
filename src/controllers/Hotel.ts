@@ -76,9 +76,23 @@ const searchHotels = async (req: Request, res: Response) => {
 
     res.json(response);
   } catch (err) {
-    console.log(err);
+    console.log('err', err);
     res.status(500).json({ message: "Error searching hotels" });
   }
 };
 
-export { searchHotels };
+const fetchHotel = async (req: Request, res: Response) => {
+  try {
+    const hotelId = req.params.id as string
+    const hotel = await Hotel.findById(hotelId)
+    if(!hotel) {
+      res.status(404).json({ message: 'Hotel not found'})
+      return
+    }
+    res.json(hotel)
+  }
+  catch(err) {
+    res.status(500).json({ message: 'Error fetching hotel'})
+  }
+}
+export { searchHotels, fetchHotel };
