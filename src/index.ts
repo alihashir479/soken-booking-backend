@@ -10,6 +10,7 @@ import UserRoutes from "./routes/User";
 import AuthRoutes from "./routes/Auth";
 import MyHotelRoutes from "./routes/MyHotel";
 import HotelRoutes from "./routes/Hotel";
+import BookingRoutes from "./routes/Booking";
 
 const app = express();
 app.use(cookieParser())
@@ -25,6 +26,7 @@ app.use("/api/user", UserRoutes);
 app.use('/api/auth', AuthRoutes)
 app.use('/api/my-hotels', MyHotelRoutes)
 app.use('/api/hotels', HotelRoutes)
+app.use('/api/bookings', BookingRoutes)
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,

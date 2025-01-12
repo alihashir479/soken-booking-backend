@@ -58,4 +58,16 @@ const login = async (req: Request, res: Response): Promise<any> => {
   }
 };
 
-export { register, login };
+const getLoggedInUser = async (req: Request, res: Response) => {
+  try {
+    const userId = req.userId
+    const user = await User.findById(userId).select('-password');
+    
+    res.json(user)
+  }
+  catch(err) {
+    res.status(500).json({ err: 'Something went wrong'})
+  }
+}
+
+export { register, login, getLoggedInUser };

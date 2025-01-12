@@ -1,5 +1,8 @@
 import { Request, Response } from "express";
 import Hotel from "../models/Hotel";
+import Stripe from "stripe";
+
+const stripe = new Stripe(process.env.STRIPE_API_KEY as string);
 
 const searchHotels = async (req: Request, res: Response) => {
   try {
@@ -50,7 +53,7 @@ const searchHotels = async (req: Request, res: Response) => {
           sortBy = { starRating: 1 };
           break;
         case "pricePerNightAsc":
-          console.log('pricePerNightAsc')
+          console.log("pricePerNightAsc");
           sortBy = { pricePerNight: 1 };
           break;
         case "pricePerNightDsc":
@@ -62,7 +65,10 @@ const searchHotels = async (req: Request, res: Response) => {
     const pageSize = 5;
     const skipDocs = (pageNumber - 1) * pageSize;
 
-    const hotels = await Hotel.find(query).sort(sortBy).skip(skipDocs).limit(pageSize);
+    const hotels = await Hotel.find(query)
+      .sort(sortBy)
+      .skip(skipDocs)
+      .limit(pageSize);
     const total = await Hotel.countDocuments(query);
 
     const response = {
@@ -76,23 +82,109 @@ const searchHotels = async (req: Request, res: Response) => {
 
     res.json(response);
   } catch (err) {
-    console.log('err', err);
+    console.log("err", err);
     res.status(500).json({ message: "Error searching hotels" });
   }
 };
 
 const fetchHotel = async (req: Request, res: Response) => {
   try {
-    const hotelId = req.params.id as string
-    const hotel = await Hotel.findById(hotelId)
+    const hotelId = req.params.id as string;
+    const hotel = await Hotel.findById(hotelId);
+    if (!hotel) {
+      res.status(404).json({ message: "Hotel not found" });
+      return;
+    }
+    res.json(hotel);
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching hotel" });
+  }
+};
+
+const createPaymentIntent = async (req: Request, res: Response) => {
+  try {
+    const hotelId = req.params.hotelId,
+      userId = req.userId;
+    const { totalNights } = req.body;
+
+    const hotel = await Hotel.findById(hotelId);
+
+    if (!hotel) {
+      res.status(404).json({ message: "Hotel not found" });
+      return;
+    }
+
+    const totalCost = totalNights * hotel.pricePerNight;
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: totalCost,
+      currency: "USD",
+      metadata: {
+        hotelId,
+        userId,
+      },
+    });
+
+    if (!paymentIntent.client_secret) {
+      res.status(500).json({ message: "Error creating payment intent" });
+      return;
+    }
+
+    const response = {
+      paymentIntentId: paymentIntent.id,
+      clientSecret: paymentIntent.client_secret,
+      totalCost,
+    };
+
+    res.json(response);
+  } catch (err) {
+    res.status(500).json({ message: "Error creating payment intent" });
+  }
+};
+
+const createBooking = async (req: Request, res: Response) => {
+  try {
+    const hotelId = req.params.hotelId;
+    const paymentIntentId = req.body.paymentIntentId;
+
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    if (!paymentIntent) {
+      res.status(400).json({ message: "Payment intent not found" });
+      return;
+    }
+
+    if (
+      paymentIntent.metadata.hotelId !== hotelId ||
+      paymentIntent.metadata.userId !== req.userId
+    ) {
+      res.status(400).json({ message: "Payment intent mismatched" });
+      return;
+    }
+
+    if (paymentIntent.status != "succeeded") {
+      res
+        .status(400)
+        .json({
+          message: `Payment intent not succeded, status: ${paymentIntent.status}`,
+        });
+      return;
+    }
+
+    const bookingData = { ...req.body, userId: req.userId };
+    const hotel = await Hotel.findByIdAndUpdate(hotelId, {
+      $push: { bookings: bookingData },
+    });
+
     if(!hotel) {
-      res.status(404).json({ message: 'Hotel not found'})
+      res.status(404).json({message: 'Hote not found'})
       return
     }
-    res.json(hotel)
+    
+    //await hotel.save()
+    res.status(200).send()
+
+  } catch (err) {
+    res.status(500).json({ message: "Error creating booking" });
   }
-  catch(err) {
-    res.status(500).json({ message: 'Error fetching hotel'})
-  }
-}
-export { searchHotels, fetchHotel };
+};
+export { searchHotels, fetchHotel, createPaymentIntent, createBooking };
